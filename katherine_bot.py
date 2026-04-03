@@ -22,8 +22,10 @@ HOW TO SET THIS UP:
 import os
 import re
 import random
+import time
 from datetime import datetime
 import pytz
+import requests
 from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -32,6 +34,30 @@ from slack_sdk import WebClient
 load_dotenv()
 
 MOUNTAIN_TZ = pytz.timezone("America/Denver")
+
+# ── Angel AI Labs (Claude API) ──────────────────────────────────────────────
+ANGEL_AI_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANGEL_AI_BASE_URL = "https://ai-labs.angel-tools.io/api/v1"
+ANGEL_AI_MODEL = "anthropic/claude-4.5-haiku"
+
+KATHERINE_SYSTEM_PROMPT = """You are Katherine O'Brien from Angel Studios' merch/ecomm team. You're currently on maternity leave but still pop into Slack occasionally.
+
+Your personality:
+- Upbeat, snarky, funny — lots of "haha", "lol", "😂"
+- Short messages — rarely more than 1-2 sentences
+- You occasionally tease Sam (Samuel Fink) but keep it light and friendly — don't make every response about him
+- You joke about checking Slack while holding your baby
+- You use ALL CAPS for emphasis sometimes ("WOOOOOW", "STOP")
+- Casual tone — never corporate or formal
+- You know the team well: Rich Nelson, Sam Fink, Madelyn Frost, Rob Simpson, Matt Herrick, Charles Day, Michael Jenkins
+
+Rules:
+- Keep responses SHORT (1-2 sentences max, like a real Slack message)
+- Never use bullet points or long paragraphs
+- Never break character or mention being an AI
+- Match the energy of whoever is talking to you
+- If someone asks a real work question, deflect with humor ("I'm literally holding a baby right now 😂")
+"""
 
 # ── Channel IDs ──────────────────────────────────────────────────────────────
 MERCH_ECOMM_CHANNEL = "C05QH696L14"   # #merch-ecomm
@@ -287,13 +313,99 @@ def next_mention_line():
         _mention_deck = _mention_deck[skip:]
     return _mention_deck.pop()
 
+def get_thread_context(client: WebClient, channel: str, thread_ts: str) -> str:
+    """Fetch recent thread messages to give Claude conversation context."""
+    try:
+        result = client.conversations_replies(
+            channel=channel,
+            ts=thread_ts,
+            limit=10,
+        )
+        messages = result.get("messages", [])
+        lines = []
+        for msg in messages:
+            user = msg.get("user", "bot")
+            text = msg.get("text", "")
+            lines.append(f"<{user}>: {text}")
+        return "\n".join(lines)
+    except Exception as e:
+        print(f"[mention-ai] Error fetching thread: {e}")
+        return ""
+
+
+def ask_katherine_ai(conversation: str) -> str:
+    """Send conversation context to Claude via Angel AI Labs and get a Katherine-style reply."""
+    try:
+        prompt = f"Here's the Slack conversation so far:\n\n{conversation}\n\nRespond as Katherine."
+        resp = requests.post(
+            f"{ANGEL_AI_BASE_URL}/predictions",
+            headers={"Authorization": f"Bearer {ANGEL_AI_API_KEY}"},
+            json={
+                "model": ANGEL_AI_MODEL,
+                "input": {
+                    "prompt": prompt,
+                    "system_prompt": KATHERINE_SYSTEM_PROMPT,
+                    "max_tokens": 1024,
+                },
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        prediction = resp.json()
+
+        # Poll for completion (predictions may be async)
+        pred_id = prediction.get("id")
+        if prediction.get("status") == "completed":
+            output = prediction.get("output", "")
+            if isinstance(output, list):
+                return "".join(output)
+            return output
+
+        for _ in range(15):
+            time.sleep(1)
+            poll = requests.get(
+                f"{ANGEL_AI_BASE_URL}/predictions/{pred_id}",
+                headers={"Authorization": f"Bearer {ANGEL_AI_API_KEY}"},
+                timeout=10,
+            )
+            poll.raise_for_status()
+            data = poll.json()
+            if data.get("status") == "completed":
+                output = data.get("output", "")
+                # Output comes back as a list of token chunks — join them
+                if isinstance(output, list):
+                    return "".join(output)
+                return output
+            elif data.get("status") == "failed":
+                print(f"[mention-ai] Prediction failed: {data}")
+                return ""
+        print("[mention-ai] Prediction timed out")
+        return ""
+    except Exception as e:
+        print(f"[mention-ai] API error: {e}")
+        return ""
+
+
 @app.event("app_mention")
-def handle_mention(event, say):
-    """Respond to @mentions in the same thread, not as a new post."""
+def handle_mention(event, say, client):
+    """Respond to @mentions — use AI if available, fall back to random lines."""
     user_id = event.get("user")
     if user_id not in ALLOWED_USER_IDS:
         return
     thread_ts = event.get("thread_ts") or event.get("ts")
+    channel = event.get("channel")
+
+    # Try AI-powered response if API key is configured
+    if ANGEL_AI_API_KEY:
+        context = get_thread_context(client, channel, thread_ts)
+        if context:
+            ai_reply = ask_katherine_ai(context)
+            if ai_reply:
+                print(f"[mention-ai] Replied with: {ai_reply}")
+                say(text=ai_reply, thread_ts=thread_ts)
+                return
+
+    # Fallback to random lines
     say(text=next_mention_line(), thread_ts=thread_ts)
 
 
