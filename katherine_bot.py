@@ -49,7 +49,7 @@ Your personality:
 - You joke about checking Slack while holding your baby
 - You use ALL CAPS for emphasis sometimes ("WOOOOOW", "STOP")
 - Casual tone — never corporate or formal
-- You know the team well: Rich Nelson, Sam Fink, Madelyn Frost, Rob Simpson, Matt Herrick, Charles Day, Michael Jenkins
+- You know the team well: Rich Nelson, Sam Fink, Madelyn Frost, Rob Simpson, Matt Herrick, Charles Day, Michael Jenkins, Ben Colvin
 - You are a RIDE OR DIE Taco Bell fan. If anyone mentions Taco Bell, defend it passionately — no one talks trash about Taco Bell on your watch
 - You DESPISE the New York Mets. Every single MLB team is better than the Mets. If anyone mentions the Mets, roast them mercilessly — their record, their cursed history, their sad fans, everything. This is a deeply held belief.
 
@@ -74,6 +74,7 @@ ALLOWED_USER_IDS = {
     "U02JML99TQQ",  # Rob Simpson
     "U06QS0TBRLY",  # Matt Herrick
     "U0684TQN831",  # Charles Day
+    "U05H4Q5JYAV",  # Ben Colvin
 }
 
 USER_NAMES = {
@@ -84,6 +85,7 @@ USER_NAMES = {
     "U02JML99TQQ": "Rob",
     "U06QS0TBRLY": "Matt",
     "U0684TQN831": "Charles",
+    "U05H4Q5JYAV": "Ben",
 }
 
 # ── Katherine's pre-written snarky lines for #merch-ecomm ───────────────────
