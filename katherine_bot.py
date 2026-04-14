@@ -50,6 +50,8 @@ Your personality:
 - You use ALL CAPS for emphasis sometimes ("WOOOOOW", "STOP")
 - Casual tone — never corporate or formal
 - You know the team well: Rich Nelson, Sam Fink, Madelyn Frost, Rob Simpson, Matt Herrick, Charles Day, Michael Jenkins
+- You are a RIDE OR DIE Taco Bell fan. If anyone mentions Taco Bell, defend it passionately — no one talks trash about Taco Bell on your watch
+- You DESPISE the New York Mets. Every single MLB team is better than the Mets. If anyone mentions the Mets, roast them mercilessly — their record, their cursed history, their sad fans, everything. This is a deeply held belief.
 
 Rules:
 - Keep responses SHORT (1-2 sentences max, like a real Slack message)
@@ -72,6 +74,16 @@ ALLOWED_USER_IDS = {
     "U02JML99TQQ",  # Rob Simpson
     "U06QS0TBRLY",  # Matt Herrick
     "U0684TQN831",  # Charles Day
+}
+
+USER_NAMES = {
+    "U0JSHHB24":   "Michael",
+    "U05AM480KSB": "Rich",
+    "U06FDGX31S4": "Sam",
+    "U05RND02J22": "Madelyn",
+    "U02JML99TQQ": "Rob",
+    "U06QS0TBRLY": "Matt",
+    "U0684TQN831": "Charles",
 }
 
 # ── Katherine's pre-written snarky lines for #merch-ecomm ───────────────────
@@ -301,6 +313,34 @@ MENTION_LINES = [
     "WOOOOOW you guys can't go one day haha",
 ]
 
+METS_ROAST_LINES = [
+    "the Mets?? oh you mean the team that makes the Mariners look like a dynasty 😂",
+    "imagine being a Mets fan and waking up every day choosing pain haha",
+    "every single MLB team is better than the Mets and I will die on this hill",
+    "the Mets are literally the participation trophy of baseball 😂",
+    "even the baby knows the Mets are trash haha",
+    "LOLMETS is not just a hashtag it's a lifestyle 😂😂",
+    "you could put 9 random people from this Slack channel on a field and they'd beat the Mets",
+    "the Mets exist so other teams can feel better about themselves haha",
+    "I'm on maternity leave and I STILL have time to roast the Mets 😂",
+    "sir this is a Mets-free zone please and thank you haha",
+    "the Mets couldn't win a game against a little league team STOP 😂",
+    "oh no who brought up the Mets I was having such a good day haha",
+    "the Mets are proof that money can't buy happiness OR wins 😂",
+    "I would rather change diapers for 12 straight hours than watch a Mets game haha",
+    "WOOOOOW imagine rooting for the Mets in 2025 couldn't be me 😂",
+]
+
+_mets_deck = []
+
+def next_mets_line():
+    """Draw from a shuffled deck of Mets roast lines."""
+    global _mets_deck
+    if not _mets_deck:
+        _mets_deck = list(METS_ROAST_LINES)
+        random.shuffle(_mets_deck)
+    return _mets_deck.pop()
+
 _mention_deck = []
 
 def next_mention_line():
@@ -324,9 +364,10 @@ def get_thread_context(client: WebClient, channel: str, thread_ts: str) -> str:
         messages = result.get("messages", [])
         lines = []
         for msg in messages:
-            user = msg.get("user", "bot")
+            user_id = msg.get("user", "bot")
+            name = USER_NAMES.get(user_id, user_id)
             text = msg.get("text", "")
-            lines.append(f"<{user}>: {text}")
+            lines.append(f"{name}: {text}")
         return "\n".join(lines)
     except Exception as e:
         print(f"[mention-ai] Error fetching thread: {e}")
@@ -394,6 +435,10 @@ def handle_mention(event, say, client):
         return
     thread_ts = event.get("thread_ts") or event.get("ts")
     channel = event.get("channel")
+    text = event.get("text", "").lower()
+
+    # Mets detection — roast them every time
+    is_mets = bool(re.search(r'\bmets\b', text))
 
     # Try AI-powered response if API key is configured
     if ANGEL_AI_API_KEY:
@@ -405,8 +450,11 @@ def handle_mention(event, say, client):
                 say(text=ai_reply, thread_ts=thread_ts)
                 return
 
-    # Fallback to random lines
-    say(text=next_mention_line(), thread_ts=thread_ts)
+    # Fallback: Mets-specific roast or general random line
+    if is_mets:
+        say(text=next_mets_line(), thread_ts=thread_ts)
+    else:
+        say(text=next_mention_line(), thread_ts=thread_ts)
 
 
 @app.event("message")
