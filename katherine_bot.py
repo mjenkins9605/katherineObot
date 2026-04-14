@@ -328,7 +328,7 @@ METS_ROAST_LINES = [
     "oh no who brought up the Mets I was having such a good day haha",
     "the Mets are proof that money can't buy happiness OR wins 😂",
     "I would rather change diapers for 12 straight hours than watch a Mets game haha",
-    "WOOOOOW imagine rooting for the Mets in 2025 couldn't be me 😂",
+    "WOOOOOW imagine rooting for the Mets in 2026 couldn't be me 😂",
 ]
 
 _mets_deck = []
@@ -437,8 +437,12 @@ def handle_mention(event, say, client):
     channel = event.get("channel")
     text = event.get("text", "").lower()
 
-    # Mets detection — roast them every time
-    is_mets = bool(re.search(r'\bmets\b', text))
+    # Mets detection — roast them every time, no AI needed
+    if re.search(r'\bmets\b', text):
+        roast = next_mets_line()
+        print(f"[mention-mets] Roasting the Mets: {roast}")
+        say(text=roast, thread_ts=thread_ts)
+        return
 
     # Try AI-powered response if API key is configured
     if ANGEL_AI_API_KEY:
@@ -450,11 +454,8 @@ def handle_mention(event, say, client):
                 say(text=ai_reply, thread_ts=thread_ts)
                 return
 
-    # Fallback: Mets-specific roast or general random line
-    if is_mets:
-        say(text=next_mets_line(), thread_ts=thread_ts)
-    else:
-        say(text=next_mention_line(), thread_ts=thread_ts)
+    # Fallback to random lines
+    say(text=next_mention_line(), thread_ts=thread_ts)
 
 
 @app.event("message")
